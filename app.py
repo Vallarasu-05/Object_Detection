@@ -5,7 +5,8 @@ from PIL import Image
 from model_loader import load_model
 from detector import run_detection
 import tempfile
-from streamlit_webrtc import webrtc_streamer
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import av
 
 st.set_page_config(page_title="YOLOv8 Detection App")
 
@@ -76,15 +77,28 @@ elif mode == "Realtime Webcam":
 
     st.header("Realtime Webcam Detection")
 
-    def video_frame_callback(frame):
+    from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+    import av
 
-        img = frame.to_ndarray(format="bgr24")
+    class VideoProcessor(VideoProcessorBase):
 
-        img = run_detection(img, model, conf)
+        def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
 
-        return img
+            img = frame.to_ndarray(format="bgr24")
+
+            # run YOLO detection
+            img = run_detection(img, model, conf)
+
+            return av.VideoFrame.from_ndarray(img, format="bgr24")
 
     webrtc_streamer(
         key="webcam",
-        video_frame_callback=video_frame_callback
+        video_processor_factory=VideoProcessor,
+        rtc_configuration={
+            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+        },
+        media_stream_constraints={
+            "video": True,
+            "audio": False
+        }
     )
