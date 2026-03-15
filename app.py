@@ -5,13 +5,14 @@ from PIL import Image
 from model_loader import load_model
 from detector import run_detection
 import tempfile
+from streamlit_webrtc import webrtc_streamer
 
 st.set_page_config(page_title="YOLOv8 Detection App")
 
 st.title("YOLOv8 Object Detection")
 
-# Load model
-model = load_model("yolov8n.pt")
+# Load YOLO model
+model = load_model("yolov8n")
 
 mode = st.sidebar.selectbox(
     "Select Mode",
@@ -26,7 +27,7 @@ if mode == "Image Detection":
 
     uploaded_file = st.file_uploader(
         "Upload Image",
-        type=["jpg","png","jpeg"]
+        type=["jpg", "png", "jpeg"]
     )
 
     if uploaded_file is not None:
@@ -44,7 +45,7 @@ elif mode == "Video Detection":
 
     uploaded_video = st.file_uploader(
         "Upload Video",
-        type=["mp4","mov","avi"]
+        type=["mp4", "mov", "avi"]
     )
 
     if uploaded_video:
@@ -67,27 +68,23 @@ elif mode == "Video Detection":
 
             stframe.image(frame, channels="BGR")
 
+        cap.release()
+
 # ---------------- REALTIME WEBCAM ----------------
 
 elif mode == "Realtime Webcam":
 
-    run = st.checkbox("Start Webcam")
+    st.header("Realtime Webcam Detection")
 
-    FRAME_WINDOW = st.image([])
+    def video_frame_callback(frame):
 
-    camera = cv2.VideoCapture(0)
+        img = frame.to_ndarray(format="bgr24")
 
-    while run:
+        img = run_detection(img, model, conf)
 
-        ret, frame = camera.read()
+        return img
 
-        if not ret:
-            st.write("Camera Error")
-            break
-
-        frame = run_detection(frame, model, conf)
-
-        FRAME_WINDOW.image(frame, channels="BGR")
-
-    else:
-        st.write("Webcam stopped")
+    webrtc_streamer(
+        key="webcam",
+        video_frame_callback=video_frame_callback
+    )
